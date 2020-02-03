@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-control" content="no-cache"> 
+<title>OpenCV.js</title>
+
+<style> /*https://www.askapache.com/hacking/speed-site-caching-cache-control/ */
+	/* Start by setting display:none to make this hidden.
+   Then we position it in relation to the viewport window
+   with position:fixed. Width, height, top and left speak
+   for themselves. Background we set to 80% white with
+   our animation centered, and no-repeating */
+.modal {
+    display:    none;
+    position:   fixed;
+    z-index:    1000;
+    top:        0;
+    left:       0;
+    height:     100%;
+    width:      100%;
+    /*background: rgba( 255, 255, 255, .8 ) 
+                url('http://i.stack.imgur.com/FhHRx.gif') 
+                50% 50% 
+                no-repeat;*/
+}
+/* When the body has the loading class, we turn
+   the scrollbar off with overflow:hidden */
+body.loading {
+    overflow: hidden;   
+}
+/* Anytime the body has the loading class, our
+   modal element will be visible */
+body.loading .modal {
+    display: block;
+}
+
+</style>
+</head>
+<body>
+<div class="container">
+	<div class="jumbotron">
+    	<h1>OpenCV - Tracking</h1> 
+    	<p>This website uses OpenCVJS to track in any uploaded video.</p> 
+  	</div>
+<div id="color" style="width:200px;height:100px;position=sticky;top:0;z-index=1000;"></div>
+<div>
+    <table cellpadding="0" cellspacing="0" width="0" border="0">
+    <tr>
+        <td>
+            <canvas id="canvasOriginal"></canvas> 
+        </td>
+        <td>
+            <canvas id="imageCanvas"></canvas> 
+        </td>
+        <td>
+            <div class="video" id="video-div"><video id="videoobj"></video></div>
+        </td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>
+            <div class="caption">videoInput</div>
+        </td>
+        <td>
+            <div class="caption">canvasOutput</div>
+        </td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>
+            <input type="file" id="videoInput" name="file" accept="video/*,.ogg,video/mp4" />
+        </td>
+        <td>
+            <button type="button" id="startAndStop" class="btn btn-primary" disabled>Start</button>
+        </td>
+        <td>
+            <div class="caption" id="videoCurrentTime" ></div>
+             <div class="caption" id="videoDuration"></div>
+        </td> 
+        <td>
+
+        </td>
+        <td>
+
+        </td>
+        </tr>
+        <tr>
+           <td>
+
+               <label for="fps">frames per second:</label>
+               <input name="fps" type="number" id="fps" min="59" step="1" max="190" value="190">
+           </td>
+           <td>
+           
+           </td>
+           <td>
+               <div id='outtrackbox'></div>
+           </td>
+           
+           <td></td>
+        </tr>
+    </table>
+</div>
+		  	
+
+                                <div class="card-botao-desenhoselec">
+                                <button type="button" id="selecionaTrac" class="btn btn-primary">Tracing Select</button></div>
+
+<div id="saida-veloci"></div>
+			  	<ul class="list-group list-group-flush">
+				    <li class="list-group-item">
+				    	<button type="button" id="startAndStop" class="btn btn-primary" disabled>Start</button>
+				    </li>
+				</ul>
+				<div class="card-footer">
+				    <a href="#" id="button" class="card-link">Download Image</a>
+				</div>
+			</div>
+  		</div>
+  	</div>
+</div>
+<div class="modal"></div>
+
+<!-- <div class="video" id="video-div" style="display:none;"><video id="videoobj"></video></div> -->
+<script>  //https://stackoverflow.com/questions/23713061/virtualhost-always-returns-default-host-with-apache-on-ubuntu-14-04
+// Reload the current page without the browser cache: window.location.reload(true);
+
+document.body.classList.add("loading");
+let streaming = false;
+let canvElement = document.getElementById('canvasOriginal');
+let contextcanv= canvElement.getContext("2d");
+let inputElement = document.getElementById('videoInput');
+let videoElement = document.getElementById('videoobj');
+
+let startAndStop = document.getElementById('startAndStop');
+let canvElementOut=document.getElementById('imageCanvas');
+let contextcanvOut=canvElementOut.getContext("2d");
+
+inputElement.addEventListener('change', (e) => {
+
+   var cache = window.sessionStorage;
+   cache.clear();
+   cache.setItem("key1", "This is my saved data");
+   console.log("Saved data: " + cache.getItem("key1"));
+   cache.removeItem("key1");
+   console.log("Saved data: " + cache.getItem("key1"));
+   videoElement.src=URL.createObjectURL(e.target.files[0]);//+'#t='+start+','+stop;  
+   console.log("this (em scr change) "+this); console.log("videoElement.src "+videoElement.src);
+   videoElement.playbackRate=0.001;
+}, false);
+
+
+videoElement.onloadedmetadata = function() {
+   alert("video loaded");
+  
+  //this ==== videoElement
+//console.log("this (em onloadmetadata) "+this); 
+  let cap =new cv.VideoCapture(this);  
+console.log("video ",this);
+
+//console.log("video size:(videoElement) "+videoElement.videoWidth+" , "+videoElement.videoHeight);
+//console.log("video size:(this) "+this.videoWidth+" , "+this.videoHeight);
+//console.log("video size:(this) "+this.width+" , "+this.height);
+   this.width=this.videoWidth;
+   this.height=this.videoHeight;
+   this.controls=true;
+   console.log("video size:(this) "+this.width+" , "+this.height);
+   console.log("video duration: "+this.duration);
+  //take first frame of the video:
+  let frame=new cv.Mat(this.videoHeight,this.videoWidth,cv.CV_8UC4); 
+  cap.read(frame);
+  canvElement.width=this.videoWidth;
+  canvElement.height=this.videoHeight;
+  contextcanv.drawImage(this,0,0);//print on canvas
+  canvElementOut.width=this.videoWidth;
+  canvElementOut.height=this.videoHeight;
+  contextcanvOut.drawImage(this,0,0);
+  document.getElementById("videoDuration").textContent=this.duration;
+
+  canvasApp();
+  startAndStop.removeAttribute('disabled');
+ let nrFrames=videoElement.mozDecodedFrames;console.log("nrFrames "+nrFrames);
+console.log("videoElement.currentSrc ",videoElement.currentSrc);
+ 
+// bind event handler to clear button
+//      document.getElementById('clear').addEventListener('click', function() {
+//        context.clearRect(0, 0, canvas.width, canvas.height);
+//      }, false);
+
+};
+//////
+function canvasApp(){ 
+// The x and y offset of the canvas from the edge of the page
+   //const rect = canvElement.getBoundingClientRect();
+   //console.log("offsetLeft: "+ canvElement.offsetLeft+" , rect.left:"+rect.left);
+   //console.log("offsetTop: "+ canvElement.offsetTop+" , rect.top:"+rect.top);
+   //console.log("canvas: "+canvElement.width+" , "+canvElement.height);
+   // When true, moving the mouse draws on the canvas
+   let isDrawing = false;
+   let mouseX;
+   let mouseY;
+   //let offsetX;
+   //let offsetY;
+   function onMouseMove(e){
+       //if (isDrawing === true) {
+          //drawLine(contextcanv, mouseX,mouseY, e.clientX-canvElement.offsetLeft, e.clientY-canvElement.offsetTop);
+          mouseX=e.offsetX;//e.clientX-canvElement.offsetLeft;
+          mouseY=e.offsetY;//e.clientY-canvElement.offsetTop;
+          let pixel=contextcanv.getImageData(mouseX,mouseY,1,1);
+          let data=pixel.data;
+          let rgba='rgba('+data[0]+', '+data[1]+', '+data[2]+', '+(data[3]/255)+')';
+          let hsvdata=RGBtoHSV(data[0],data[1],data[2]);
+          let hsv='hsv('+hsvdata.h+', '+hsvdata.s+', '+hsvdata.v+')';
+          color.style.background=rgba;
+          color.textContent=rgba+'\n'+hsv;
+          //offsetX=e.offsetX;
+          //offsetY=e.offsetY;
+       //}
+   }
+   function onMouseClick(e){
+      console.log("click: "+mouseX+", "+mouseY); //console.log("click:offset "+offsetX+", "+offsetY);
+   }
+   //function onMouseDown(e){
+   //   mouseX = e.clientX -canvElement.offsetLeft;
+   //   mouseY = e.clientY -canvElement.offsetTop;
+   //   isDrawing = true;
+   //}
+   canvElement.addEventListener("mousemove",onMouseMove,false);
+   canvElement.addEventListener("click",onMouseClick,false);
+   // Add the event listeners for mousedown, mousemove, and mouseup
+   //canvElement.addEventListener('mousedown',onMouseDown,false);
+   //window.addEventListener('mouseup', e => {
+   //   if (isDrawing === true) {
+   //       drawLine(contextcanv,mouseX,mouseY, e.clientX -canvElement.offsetLeft, e.clientY -canvElement.offsetTop);
+   //       mouseX=0;
+   //       mouseY=0;
+   //       isDrawing=false;
+   //    }
+   //});
+
+   function drawLine(context, x1, y1, x2, y2) {
+      context.beginPath();
+      context.strokeStyle = 'black';
+      context.lineWidth = 1;
+      context.moveTo(x1, y1);
+      context.lineTo(x2, y2);
+      context.stroke();
+      context.closePath();
+   }
+}
+///////////////
+function denseflowrun() {
+  	let cap =new cv.VideoCapture(videoElement);
+
+console.log("videoElement : "+videoElement+"videoElement.videoHeight : "+videoElement.videoHeight);
+console.log("videoElement.playbackRate ",videoElement.playbackRate);
+// take first frame of the video
+        let frame1 = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+        cap.read(frame1);
+console.log("cap ",cap);
+//console.log("cap.get(CAP_PROP_FPS) ",cap.get(CAP_PROP_FPS));
+
+       let prvs = new cv.Mat();
+       cv.cvtColor(frame1, prvs, cv.COLOR_RGBA2GRAY);
+       frame1.delete();
+       let hsv = new cv.Mat();
+       let hsv0 = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC1);
+       let hsv1 = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC1, new cv.Scalar(255));
+       let hsv2 = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC1);
+       let hsvVec = new cv.MatVector();
+       hsvVec.push_back(hsv0); hsvVec.push_back(hsv1); hsvVec.push_back(hsv2);
+
+       let frame2 = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC4);
+       let next = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC1);
+       let flow = new cv.Mat(videoElement.height, videoElement.width, cv.CV_32FC2);
+       let flowVec = new cv.MatVector();
+       let mag = new cv.Mat(videoElement.height, videoElement.width, cv.CV_32FC1);
+       let ang = new cv.Mat(videoElement.height, videoElement.width, cv.CV_32FC1);
+       let rgb = new cv.Mat(videoElement.height, videoElement.width, cv.CV_8UC3);
+        //console.log('cap.read(cv.CV_CAP_PROP_FPS) ',cap.read(cv.CV_CAP_PROP_FPS));
+const nrFrames=videoElement.mozDecodedFrames;console.log("nrFrames "+nrFrames);
+
+        const FPS=parseInt(document.getElementById("fps"));
+        let useFPS = FPS*videoElement.playbackRate;
+ console.log("videoElement : ",videoElement);
+ console.log("videoElement.duration : ",videoElement.duration+" videoElement.mozDecodedFrames: "+videoElement.mozDecodedFrames);
+ console.log("videoElement.mozParsedFrames : ",videoElement.mozParsedFrames+" videoElement.mozDecodedFrames: "+videoElement.mozDecodedFrames);
+ console.log("FPS :"+FPS+" useFPS: "+useFPS);
+       function processVideo() {
+           if (!streaming) {
+            // clean and stop.
+              prvs.delete(); hsv.delete(); hsv0.delete(); hsv1.delete(); hsv2.delete();
+              hsvVec.delete(); frame2.delete(); flow.delete(); flowVec.delete(); next.delete();
+              mag.delete(); ang.delete(); rgb.delete();
+              return;
+           }
+              let begin = Date.now();
+              // start processing.
+              cap.read(frame2);
+              cv.cvtColor(frame2, next, cv.COLOR_RGBA2GRAY);
+              cv.calcOpticalFlowFarneback(prvs, next, flow, 0.5, 4, 8, 3, 7, 1.5, 0);//(prev,next,flow,pyrScale,levels, winsize, iterations, polyN, polySigma, flags)
+              cv.split(flow, flowVec);
+              let u = flowVec.get(0);
+              let v = flowVec.get(1);
+              cv.cartToPolar(u, v, mag, ang);
+              u.delete(); v.delete();
+              ang.convertTo(hsv0, cv.CV_8UC1, 180/Math.PI/2);
+              cv.normalize(mag, hsv2, 0, 255, cv.NORM_MINMAX, cv.CV_8UC1);
+              cv.merge(hsvVec, hsv);
+              cv.cvtColor(hsv, rgb, cv.COLOR_HSV2RGB);
+              cv.imshow('imageCanvas', rgb);
+contextcanvOut.font="12px Arial";
+contextcanvOut.fillStyle="white";
+contextcanvOut.fillText("Current time: "+videoElement.currentTime+"s",canvElementOut.width-150,canvElementOut.height-30);
+              next.copyTo(prvs);
+    
+         console.log("Current time: "+videoElement.currentTime);
+         console.log("goodOld ",);
+         console.log("goodNew ",);
+        
+
+        // schedule the next one.
+            let delay = 1000/useFPS - (Date.now() - begin);
+            setTimeout(processVideo, delay);
+         
+      };
+
+      // schedule the first one.
+      setTimeout(processVideo, 0);	
+      //console.log("p0 ",p0);
+      //console.log("p1 ",p1);
+      console.log("");
+
+};
+startAndStop.addEventListener('click', () => {
+    if (!streaming) {
+        
+        videoElement.play().then(() => {
+            onVideoStarted();
+        });
+    } else {
+        videoElement.pause();
+        videoElement.currentTime = 0;
+        onVideoStopped();
+    }
+});
+
+function onVideoStarted() {
+    streaming = true;
+    startAndStop.innerText = 'Stop';
+    //videoInput.height = videoInput.width * (videoInput.videoHeight / videoInput.videoWidth);
+    //utils.executeCode('codeEditor');
+    denseflowrun();
+}
+
+function onVideoStopped() {
+    streaming = false;
+    console.log("canvElementOut : "+canvElementOut.width+", "+canvElementOut.height);
+    console.log("canvElementOut ",canvElementOut);
+    console.log("contextcanvOut ",contextcanvOut);
+    //contextcanvOut.clearRect(0, 0, canvElemetOut.width, canvElementOut.height);
+    startAndStop.innerText = 'Start';
+}
+document.getElementById('button').onclick = function() {
+    this.href = document.getElementById("imageCanvas").toDataURL();
+    this.download = "image.png";
+};
+function onOpenCvReady() {
+  document.body.classList.remove("loading");
+  let cv=window.cv;
+};
+
+videoElement.onended=function(){
+   onVideoStopped();};
+/* accepts parameters
+ * r  Object = {r:x, g:y, b:z}
+ * OR 
+ * r, g, b
+*/
+function RGBtoHSV(r, g, b) {
+    if (arguments.length === 1) {
+        g = r.g, b = r.b, r = r.r;
+    }
+    var max = Math.max(r, g, b), min = Math.min(r, g, b),
+        d = max - min,
+        h,
+        s = (max === 0 ? 0 : d / max),
+        v = max / 255;
+
+    switch (max) {
+        case min: h = 0; break;
+        case r: h = (g - b) + d * (g < b ? 6: 0); h /= 6 * d; break;
+        case g: h = (b - r) + d * 2; h /= 6 * d; break;
+        case b: h = (r - g) + d * 4; h /= 6 * d; break;
+    }
+
+    return {
+        h: h*179,
+        s: s*255,
+        v: v*255
+    };
+}
+</script>
+<script async src="js/opencv.js" onload="onOpenCvReady();"></script>
+</body>
+</html>

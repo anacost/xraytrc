@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-control" content="no-cache"> 
+<title>OpenCV.js</title>
+
+<style> /*https://www.askapache.com/hacking/speed-site-caching-cache-control/ */
+	/* Start by setting display:none to make this hidden.
+   Then we position it in relation to the viewport window
+   with position:fixed. Width, height, top and left speak
+   for themselves. Background we set to 80% white with
+   our animation centered, and no-repeating */
+.modal {
+    display:    none;
+    position:   fixed;
+    z-index:    1000;
+    top:        0;
+    left:       0;
+    height:     100%;
+    width:      100%;
+    /*background: rgba( 255, 255, 255, .8 ) 
+                url('http://i.stack.imgur.com/FhHRx.gif') 
+                50% 50% 
+                no-repeat;*/
+}
+/* When the body has the loading class, we turn
+   the scrollbar off with overflow:hidden */
+body.loading {
+    overflow: hidden;   
+}
+/* Anytime the body has the loading class, our
+   modal element will be visible */
+body.loading .modal {
+    display: block;
+}
+
+label {
+    display: block;
+    font: 1rem 'Fira Sans', sans-serif;
+}
+
+input,
+label {
+    margin: .4rem 0;
+}
+</style>
+</head>
+<body>
+<script src="js/d3.v5.min.js"></script>
+<div class="container">
+	<div class="jumbotron">
+    	<h1>OpenCV - Tracking</h1> 
+    	<p>Using OpenCVJS to track in any uploaded video.</p> 
+  	</div>
+<div id="color" style="width:200px;height:100px;position=sticky;top:0;z-index=1000;"></div>
+<div>
+    <table cellpadding="0" cellspacing="0" width="0" border="0" id="table0">
+    <tr>
+        <td>
+            <canvas id="canvasOriginal"></canvas> 
+        </td>
+        <td>
+            <canvas id="imageCanvas"></canvas> 
+        </td>
+        <td>
+            <div class="video" id="video-div"><video id="videoobj"></video></div>
+        </td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>
+            <div class="caption">videoInput</div>
+        </td>
+        <td>
+            <div class="caption">canvasOutput</div>
+        </td>
+        <td></td>
+        <td></td>
+    </tr>
+    <tr>
+        <td>
+            <input type="file" id="videoInput" name="file" accept="video/*,.ogg,video/mp4" />
+        </td>
+        <td>
+            <button type="button" id="startAndStop" class="btn btn-primary" disabled>Start</button>
+        </td>
+        <td>
+            <div class="caption" id="videoCurrentTime" ></div>
+             <div class="caption" id="videoDuration"></div>
+        </td> 
+        <td>
+
+        </td>
+        </tr>
+        <tr>
+           <td>
+
+               <label for="xlocin">x coordinate of tracking rectangle (upper left corner):</label>
+               <input name="xlocin" type="number" id="xlocin" min="0" step="1">           
+         
+            
+               <label for="ylocin">y coordinate of tracking rectangle (upper left corner):</label>
+               <input name="ylocin" type="number" id="ylocin" min="0" step="1">
+          
+            
+               <label for="widthin">width of tracking rectangle (to lower right corner):</label>
+               <input name="widthin" type="number" id="widthin" min="0" step="1">           
+           
+            
+               <label for="heightin">height of tracking rectangle (to lower right corner):</label>
+               <input name="heightin" type="number" id="heightin" min="0" step="1">
+            
+            
+               <label for="lowScalarV">lowest pixel intensity to track:</label>
+               <input name="lowScalarV" type="number" id="lowScalarV" min="0" step="1">
+
+
+               <label for="highScalarV">highest pixel intensity to track:</label>
+               <input name="highScalarV" type="number" id="highScalarV" min="0" step="1">
+
+               <label for="hlScalarV">quantify the value of pixel intensity levels to track:</label>
+               <input name="hlScalarV" type="number" id="hlScalarV" min="1" step="1">
+Subwindow to reduce image:
+               <label for="x0">horizontal distance from upper left corner:</label>
+               <input name="x0" type="number" id="x0" min="0" step="1" value="0">
+
+               <label for="x1">horizontal right corner:</label>
+               <input name="x1" type="number" id="x1" min="1" step="1">
+
+               <label for="y0">vertical distance from upper left corner:</label>
+               <input name="y0" type="number" id="y0" min="1" step="1" value="0">
+
+               <label for="y1">vertical right corner:</label>
+               <input name="y1" type="number" id="y1" min="1" step="1">
+
+               <label for="fps">frames per second:</label>
+               <input name="fps" type="number" id="fps" min="59" step="1" max="190" value="190">
+           </td>
+           <td>
+           
+           </td>
+           <td>
+               <div id='outtrackbox'></div>
+           </td>
+           
+           <td></td>
+        </tr>
+    </table>
+</div>
+		  	
+
+                                <div class="card-botao-desenhoselec">
+                                <button type="button" id="selecionaTrac" class="btn btn-primary">Tracing Select</button></div>
+
+<div id="saida-veloci"></div>
+			  	<ul class="list-group list-group-flush">
+				    <li class="list-group-item">
+				    	
+				    </li>
+				</ul>
+				<div class="card-footer">
+				    <a href="#" id="downloadbutton" class="card-link">Download Image</a>
+				</div>
+			</div>
+  		</div>
+  	</div>
+</div>
+<div class="modal"></div>
+
+<!-- <div class="video" id="video-div" style="display:none;"><video id="videoobj"></video></div> -->
+<script>  //https://stackoverflow.com/questions/23713061/virtualhost-always-returns-default-host-with-apache-on-ubuntu-14-04
+// Reload the current page without the browser cache: window.location.reload(true);
+
+document.body.classList.add("loading");
+function init(){
+   let streaming = false;
+   let canvElement = document.getElementById('canvasOriginal');
+   let contextcanv= canvElement.getContext("2d");
+   let inputElement = document.getElementById('videoInput');
+   let videoElement = document.getElementById('videoobj');
+   let startAndStop = document.getElementById('startAndStop');
+   let canvElementOut=document.getElementById('imageCanvas');
+   let divouttrackbox=document.getElementById('outtrackbox');
+   let contextcanvOut=canvElementOut.getContext("2d");
+
+inputElement.addEventListener('change', (e) => {
+   let start=0.5;
+   let stop=1.0;
+   var cache = window.sessionStorage;
+   cache.clear();
+   cache.setItem("key1", "This is my saved data");
+   console.log("Saved data: " + cache.getItem("key1"));
+   cache.removeItem("key1");
+   console.log("Saved data: " + cache.getItem("key1"));
+   videoElement.src=URL.createObjectURL(e.target.files[0]);//+'#t='+start+','+stop;  
+   videoElement.playbackRate=0.001;
+   //console.log("this (em scr change) "+this); console.log("cv "+cv);
+}, false);
+
+
+videoElement.onloadedmetadata = function() {
+   alert("video loaded");
+  let cap =new cv.VideoCapture(this);  
+console.log("video ",this);
+
+   this.width=this.videoWidth;
+   this.height=this.videoHeight;
+   this.controls=true;
+   console.log("video size:(this) "+this.width+" , "+this.height);
+   console.log("video duration: "+this.duration);
+  //take first frame of the video:
+  let frame=new cv.Mat(this.videoHeight,this.videoWidth,cv.CV_8UC4); 
+  cap.read(frame);
+  canvElement.width=this.videoWidth;
+  canvElement.height=this.videoHeight;
+  contextcanv.drawImage(this,0,0);//print on canvas
+  canvElementOut.width=this.videoWidth;
+  canvElementOut.height=this.videoHeight;
+  contextcanvOut.drawImage(this,0,0);
+  let imagecanv = contextcanvOut.getImageData(0,0,this.width,this.height);
+  
+  document.getElementById("videoDuration").textContent=this.duration+' s';
+  console.log("canvas context ",contextcanv.getImageData(0,0,canvElementOut.width,canvElementOut.height));
+  
+  let minInten=255,maxInten=0;
+  for (var i=0; i<imagecanv.data.length; i+=4) {
+          maxInten=Math.max(imagecanv.data[i],imagecanv.data[i+1],imagecanv.data[i+2],maxInten);
+          minInten=Math.min(imagecanv.data[i],imagecanv.data[i+1],imagecanv.data[i+2],minInten);
+        }
+  document.getElementById("lowScalarV").value=document.getElementById("lowScalarV").min=minInten;
+  document.getElementById("highScalarV").value=document.getElementById("highScalarV").max=maxInten;
+  document.getElementById("x0").max=this.width-1;
+  document.getElementById("x1").max=document.getElementById("x1").value=this.width;
+  document.getElementById("y0").max=this.height-1;
+  document.getElementById("y1").max=document.getElementById("y1").value=this.height;
+
+  //document.getElementById("lowScalarV").required=document.getElementById("highScalarV").required=document.getElementById("hlScalarV").required=true;
+
+  document.getElementById("hlScalarV").value=document.getElementById("hlScalarV").max=(maxInten-minInten);
+
+  canvasApp(imagecanv);
+
+};
+//////
+
+function canvasApp(imagecanv){ 
+console.log("imagecanv ",imagecanv);
+// The x and y offset of the canvas from the edge of the page
+   //const rect = canvElement.getBoundingClientRect();
+   //console.log("offsetLeft: "+ canvElement.offsetLeft+" , rect.left:"+rect.left);
+   //console.log("offsetTop: "+ canvElement.offsetTop+" , rect.top:"+rect.top);
+   //console.log("canvas: "+canvElement.width+" , "+canvElement.height);
+   // When true, moving the mouse draws on the canvas
+   let mouseX;
+   let mouseY;
+   let rect={};
+   rect.isDrawing = false;
+   //let offsetX;
+   //let offsetY;
+   function onMouseMove(e){
+       //if (isDrawing === true) {
+          //drawLine(contextcanv, mouseX,mouseY, e.clientX-canvElement.offsetLeft, e.clientY-canvElement.offsetTop);
+          mouseX=e.offsetX;//e.clientX-canvElement.offsetLeft;
+          mouseY=e.offsetY;//e.clientY-canvElement.offsetTop;
+          let pixel=contextcanv.getImageData(mouseX,mouseY,1,1);
+          let data=pixel.data;
+          let rgba='rgba('+data[0]+', '+data[1]+', '+data[2]+', '+(data[3]/255)+')';
+          let hsvdata=RGBtoHSV(data[0],data[1],data[2]);
+          let hsv='hsv('+hsvdata.h+', '+hsvdata.s+', '+hsvdata.v+')';
+          color.style.background=rgba;
+          color.textContent=rgba+'\n'+hsv;
+          //offsetX=e.offsetX;
+          //offsetY=e.offsetY;
+       //}
+   }
+   function onMouseClick(e){
+      console.log("click: "+mouseX+", "+mouseY); //console.log("click:offset "+offsetX+", "+offsetY);
+   }
+   function onMouseDown(e){
+      rect.isDrawing=true;
+      rect.x0=mouseX;
+      rect.y0=mouseY;
+   //   mouseX = e.clientX -canvElement.offsetLeft;
+   //   mouseY = e.clientY -canvElement.offsetTop;
+   //   isDrawing = true;
+   }
+   canvElement.addEventListener("mousemove",onMouseMove,false);
+   canvElement.addEventListener("click",onMouseClick,false);
+   // Add the event listeners for mousedown, mousemove, and mouseup
+   canvElement.addEventListener('mousedown',onMouseDown,false);
+   window.addEventListener('mouseup', e => {
+      if (rect.isDrawing === true) {
+   //drawLine(contextcanv,mouseX,mouseY, e.clientX -canvElement.offsetLeft, e.clientY -canvElement.offsetTop);
+          drawRect(contextcanv,rect.x0,rect.y0,mouseX,mouseY);
+          mouseX=0;
+          mouseY=0;
+          rect.isDrawing=false;
+       }
+   });
+   function drawRect(context,x0,y0,x1,y1){
+      context.strokeStyle='green';
+      let x = Math.min(x0,x1),
+          y = Math.min(y0,y1),
+          w = Math.abs(x1-x0),
+          h = Math.abs(y1-y0);
+      context.putImageData(imagecanv,0,0);
+      context.strokeRect(x,y,w,h);
+      document.getElementById("xlocin").value=x;
+      document.getElementById("ylocin").value=y;document.getElementById("widthin").value=w;document.getElementById("heightin").value=h;
+      startAndStop.removeAttribute('disabled');
+   }
+   function drawLine(context, x1, y1, x2, y2) {
+      context.beginPath();
+      context.strokeStyle='black';
+      context.lineWidth = 1;
+      context.moveTo(x1,y1);
+      context.lineTo(x2,y2);
+      context.stroke();
+      context.closePath();
+   }
+   //document.getElementById("lowScalarV").addEventListener("change",changinV);
+   //document.getElementById("highScalarV").addEventListener("change",changinV);
+   //document.getElementById("hlScalarV").addEventListener("change",changinV);
+   //function changinV(){
+   //   if(document.getElementById("highScalarV").value>document.getElementById("lowScalarV").value){
+         
+   //      document.getElementById("hlScalarV").max=document.getElementById("highScalarV").value-document.getElementById("lowScalarV").value;
+   //      document.getElementById("highScalarV").min=document.getElementById("lowScalarV").value+1;
+   //      document.getElementById("lowScalarV").max=document.getElementById("highScalarV").value-1;
+   //   }else{alert("fix ");}
+      
+   //}
+}
+////////////
+function camshiftrun() {
+        let result=[];
+  	let cap =new cv.VideoCapture(videoElement);
+  //take first frame of the video:
+        let frame=new cv.Mat(videoElement.videoHeight,videoElement.videoWidth,cv.CV_8UC4);//CV_8U eh 8bit, 0 a 255
+
+        cap.read(frame);
+console.log('image width: ' + frame.cols + '\n' +
+            'image height: ' + frame.rows + '\n' +
+            'image size: ' + frame.size().width + '*' + frame.size().height + '\n' +
+            'image depth: ' + frame.depth() + '\n' +
+            'image channels ' + frame.channels() + '\n' +
+            'image type: ' + frame.type() + '\n');
+// create a subWindow to restrict search and improve it relative to grayscale
+let x0=parseInt(document.getElementById("x0").value),y0=parseInt(document.getElementById("y0").value);
+let wsub=parseInt(document.getElementById("x1").value)-x0,hsub=parseInt(document.getElementById("y1").value)-y0;
+let subWindow=new cv.Rect(x0,y0,wsub,hsub);
+// initial location of window
+        let w=parseInt(document.getElementById("widthin").value),h=parseInt(document.getElementById("heightin").value);
+        let xlocin=parseInt(document.getElementById("xlocin").value),ylocin=parseInt(document.getElementById("ylocin").value);
+console.log("w "+w+", h "+h+", xlocin "+xlocin+", ylocin "+ylocin);
+        let trackWindow=new cv.Rect(xlocin-x0,ylocin-y0,w,h);//relative location
+// set up the ROI for tracking
+let subframe=frame.roi(subWindow);
+        let roi=subframe.roi(trackWindow);
+console.log('roi:::: image width: ' + roi.cols + '\n' +
+            'image height: ' + roi.rows + '\n' +
+            'image size: ' + roi.size().width + '*' + roi.size().height + '\n' +
+            'image depth: ' + roi.depth() + '\n' +
+            'image channels ' + roi.channels() + '\n' +
+            'image type: ' + roi.type() + '\n');
+        let grayRoi = new cv.Mat();
+//https://docs.opencv.org/2.4/modules/imgproc/doc/miscellaneous_transformations.html
+        cv.cvtColor(roi, grayRoi, cv.COLOR_RGBA2GRAY);//converte de rgba para gray
+console.log('grayRoi:::: image width: ' + grayRoi.cols + '\n' +
+            'image height: ' + grayRoi.rows + '\n' +
+            'image size: ' + grayRoi.size().width + '*' + grayRoi.size().height + '\n' +
+            'image depth: ' + grayRoi.depth() + '\n' +
+            'image channels ' + grayRoi.channels() + '\n' +
+            'image type: ' + grayRoi.type() + '\n');
+        let mask = new cv.Mat();
+
+        let lowScalar = new cv.Scalar(parseInt(document.getElementById("lowScalarV").value));//pixel intensity in grayscale 
+        let highScalar = new cv.Scalar(parseInt(document.getElementById("highScalarV").value));
+        let low = new cv.Mat(grayRoi.rows, grayRoi.cols, grayRoi.type(), lowScalar);
+        let high = new cv.Mat(grayRoi.rows, grayRoi.cols, grayRoi.type(), highScalar);
+        cv.inRange(grayRoi, low, high, mask);//thresholding: https://docs.opencv.org/3.4/da/d97/tutorial_threshold_inRange.html
+        let roiHist = new cv.Mat();
+        let grayRoiVec = new cv.MatVector();
+        grayRoiVec.push_back(grayRoi);
+        const channels=[0];//=gray
+        const histSize=[parseInt(document.getElementById("hlScalarV").value)];//quantify the value to 30 levels= vbins
+        const ranges=[parseInt(document.getElementById("lowScalarV").value),parseInt(document.getElementById("highScalarV").value)];
+//https://docs.opencv.org/3.4/d6/dc7/group__imgproc__hist.html :
+        cv.calcHist(grayRoiVec,channels,mask,roiHist,histSize,ranges);//cv.calcHist(images,channels,mask,histSize,ranges[,hist[,accumulate]]	)
+        cv.normalize(roiHist, roiHist, 0, 255, cv.NORM_MINMAX);//(src,dst,a,b,norm_type,mask=NULL)//norm cv.MINMAX maps into range [a,b]
+
+        roi.delete(); grayRoi.delete(); mask.delete(); low.delete(); high.delete(); grayRoiVec.delete();
+
+//Setup the termination criteria, either 50 iterations or move by at least 1 pt
+        let termCrit = new cv.TermCriteria(cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 50, 1);
+
+        let gray = new cv.Mat(hsub,wsub,cv.CV_8UC1);//(videoElement.height, videoElement.width, cv.CV_8UC1);
+        let grayVec = new cv.MatVector();
+        grayVec.push_back(gray);
+        let dst = new cv.Mat();
+        let trackBox = null;
+
+//console.log('cap.get(cv.CV_CAP_PROP_FPS) ',cap.get(cv.CV_CAP_PROP_FPS));
+        const FPS=parseInt(document.getElementById("fps"));
+        let useFPS = FPS*videoElement.playbackRate;
+        function processVideo() {
+           if (!streaming) {
+            // clean and stop.
+            frame.delete(); dst.delete(); grayVec.delete(); roiHist.delete(); gray.delete();
+            return;
+           }
+              let begin = Date.now();
+              // start processing.
+              cap.read(frame);
+subframe = frame.roi(subWindow);
+              cv.cvtColor(subframe, gray, cv.COLOR_RGBA2GRAY);
+              cv.calcBackProject(grayVec, channels, roiHist,dst,ranges, 1);//(images,channels,hist,ranges,scale[, dst]) → dst
+//scale – Optional scale factor for the output back projection. 
+//The functions calcBackProject calculate the back project of the histogram. That is, similarly to calcHist , at each location (x, y) the function collects the values from the selected channels in the input images and finds the corresponding histogram bin. But instead of incrementing it, the function reads the bin value, scales it by scale , and stores in backProject(x,y).
+              // apply camshift to get the new location
+              [trackBox, trackWindow] = cv.CamShift(dst, trackWindow, termCrit);
+//console.log("trackBox ",trackBox);
+              // Draw it on image
+              let pts = cv.rotatedRectPoints(trackBox);
+              pts.forEach(translat);function translat(element,index,arr){arr[index].x+=x0;arr[index].y+=y0;}
+
+              cv.line(frame, pts[0], pts[1], [255, 0, 0, 255], 3);//em vermelho
+              cv.line(frame, pts[1], pts[2], [255, 0, 0, 255], 3);
+              cv.line(frame, pts[2], pts[3], [255, 0, 0, 255], 3);
+              cv.line(frame, pts[3], pts[0], [255, 0, 0, 255], 3);
+              cv.imshow('imageCanvas', frame);
+              let client=result.find(d=>d.Time===videoElement.currentTime);
+              if(!client){
+                 result.push({Angle:trackBox.angle,Centre:trackBox.center,Time:videoElement.currentTime});}
+contextcanvOut.font="12px Arial";
+contextcanvOut.fillText("Current time: "+videoElement.currentTime+"s",canvElementOut.width-150,canvElementOut.height-30);
+              // schedule the next one.
+              let delay = 1000/FPS - (Date.now() - begin);
+              setTimeout(processVideo, delay);
+              if(Math.abs(videoElement.currentTime-videoElement.duration)<0.005){plotData(result);}
+         
+      };
+      // schedule the first one.
+      setTimeout(processVideo, 0);	
+      console.log("result ",result); 
+
+};
+startAndStop.addEventListener('click', () => {
+    if (!streaming) {
+        
+        videoElement.play().then(() => {
+            onVideoStarted();
+        });
+    } else {
+        videoElement.pause();
+        videoElement.currentTime = 0;
+        onVideoStopped();
+    }
+});
+
+function plotData(clients){ console.log("clients ",clients);console.log("typeof clients ",typeof clients);
+console.log("clients.length",clients.length); console.log("clients[1] ",clients[1]); 
+   /*result=result.map(d=>{
+          d["Angle"]=parseFloat(d["Angle"]);
+          d["Time"]=Date.parse(d["Time"]);
+          d.Centre.x=parseFloat(d.Centre.x);d.Centre.y=parseFloat(d.Centre.y);
+          return d
+      });*/
+      let minTime=d3.min(clients,d=>d.Time),maxTime=d3.max(clients,d=>d.Time),minAngle=d3.min(clients,d=>d.Angle),maxAngle=d3.max(clients,d=>d.Angle);console.log("time ",minTime," ",maxTime,"typeof minTime ",typeof minTime);
+console.log("angle ",minAngle," ",maxAngle,"typeof minAngle ",typeof minAngle);
+      let svgWidth=700,svgHeight=500;
+      let margin = {top: 20, right: 20, bottom: 30, left: 50};
+      let width= svgWidth- margin.left - margin.right;
+      let height= svgHeight- margin.top - margin.bottom;
+      let scalevert = d3.scaleLinear().range([height,0])   //from bottom to top px!!!!
+                      .domain(d3.extent(clients,d=>d.Angle));
+				
+      let scalehor = d3.scaleLinear().range([0,width]).domain(d3.extent(clients,d=>d.Time));
+		
+      let xAxis = d3.axisBottom(scalehor);//.tickFormat(d3.timeFormat("%s"));//.tickValues([0.1,1]);
+	
+      let yAxis = d3.axisLeft(scalevert).ticks(7);//.tickValues([30,50,100,1000]);
+      document.getElementById("outtrackbox").innerHTML='';//clean
+      let svg = d3.select("#outtrackbox").append("div").append("svg").attr("id", "svgid")
+                 .attr("width", svgWidth).attr("height", svgHeight).style("border","solid 1px #000");
+      let g = svg.append("g").attr("transform","translate("+margin.left+","+margin.top+")");
+		//height= height +2.5;
+      g.append("g").attr("id", "xAxis").attr("transform","translate(0,"+height+")").call(xAxis)
+           .append("text").style("fill","#000").text("time (s)").attr("x", 190).attr("dy","2.3em");
+      g.append("g").attr("id", "yAxis").call(yAxis).append("text")
+	   .style("fill","#000").attr("transform","rotate(-90)").attr("y", 6).attr("dy", "-4.41em").attr("text-anchor", "end")
+           .text("rotation ()");
+      let lineGenerator = d3.line().x(d => scalehor(d.Time)).y(d => scalevert(d.Angle))
+           .defined(d => !!d.Angle);
+      g.append("g").attr("id", "line0")
+			.append("path")
+			.datum(clients)
+			.attr("d", lineGenerator)
+			.style("fill", "none")
+			.style("stroke", "steelblue")
+			.style("stroke-width", 1.5)
+			.style("stroke-linejoin", "round")
+			.style("stroke-linecap", "round")
+			.attr("class", "line");
+
+
+//////x:
+     let scalevertX = d3.scaleLinear().range([height,0])   //from bottom to top px!!!!
+                      .domain(d3.extent(clients,d=>d.Centre.x));
+     let yAxisX = d3.axisLeft(scalevertX).ticks(7);
+     let svgX = d3.select("#outtrackbox").append("div").append("svg").attr("id", "svgidX")
+                 .attr("width", svgWidth).attr("height", svgHeight).style("border","solid 1px #000");
+     let gX = svgX.append("g").attr("transform","translate("+margin.left+","+margin.top+")");
+		//height= height +2.5;
+      gX.append("g").attr("id", "xAxis").attr("transform","translate(0,"+height+")").call(xAxis)
+           .append("text").style("fill","#000").text("time (s)").attr("x", 190).attr("dy","2.3em");
+      gX.append("g").attr("id", "yAxisX").call(yAxisX).append("text")
+	   .style("fill","#000").attr("transform","rotate(-90)").attr("y", 6).attr("dy", "-4.41em").attr("text-anchor", "end")
+           .text("x (px)");
+      let lineGeneratorX = d3.line().x(d => scalehor(d.Time)).y(d => scalevertX(d.Centre.x))
+           .defined(d => !!d.Centre.x);
+      gX.append("g").attr("id", "lineX")
+			.append("path")
+			.datum(clients)
+			.attr("d", lineGeneratorX)
+			.style("fill", "none")
+			.style("stroke", "steelblue")
+			.style("stroke-width", 1.5)
+			.style("stroke-linejoin", "round")
+			.style("stroke-linecap", "round")
+			.attr("class", "line");
+
+//////y:
+     let scalevertY = d3.scaleLinear().range([height,0])   //from bottom to top px!!!!
+                      .domain(d3.extent(clients,d=>d.Centre.y));
+     let yAxisY = d3.axisLeft(scalevertY).ticks(7);
+     let svgY = d3.select("#outtrackbox").append("div").append("svg").attr("id", "svgidX")
+                 .attr("width", svgWidth).attr("height", svgHeight).style("border","solid 1px #000");
+     let gY = svgY.append("g").attr("transform","translate("+margin.left+","+margin.top+")");
+		//height= height +2.5;
+      gY.append("g").attr("id", "xAxis").attr("transform","translate(0,"+height+")").call(xAxis)
+           .append("text").style("fill","#000").text("time (s)").attr("x", 190).attr("dy","2.3em");
+      gY.append("g").attr("id", "yAxisY").call(yAxisY).append("text")
+	   .style("fill","#000").attr("transform","rotate(-90)").attr("y", 6).attr("dy", "-4.41em").attr("text-anchor", "end")
+           .text("y (px)");
+      let lineGeneratorY = d3.line().x(d => scalehor(d.Time)).y(d => scalevertY(d.Centre.y))
+           .defined(d => !!d.Centre.y);
+      gY.append("g").attr("id", "lineY")
+			.append("path")
+			.datum(clients)
+			.attr("d", lineGeneratorY)
+			.style("fill", "none")
+			.style("stroke", "steelblue")
+			.style("stroke-width", 1.5)
+			.style("stroke-linejoin", "round")
+			.style("stroke-linecap", "round")
+			.attr("class", "line");
+}
+
+function onVideoStarted() {
+    streaming = true;
+    startAndStop.innerText = 'Stop';
+    camshiftrun();
+}
+
+function onVideoStopped() {
+    streaming = false;
+    console.log("canvElementOut : "+canvElementOut.width+", "+canvElementOut.height);
+    console.log("canvElementOut ",canvElementOut);
+    console.log("contextcanvOut ",contextcanvOut);
+    startAndStop.innerText = 'Start';
+}
+document.getElementById('downloadbutton').onclick = function() {
+    this.href = document.getElementById("imageCanvas").toDataURL();
+    this.download = "image.png";
+};
+
+
+videoElement.onended=function(){
+   onVideoStopped();};
+/* accepts parameters
+ * r  Object = {r:x, g:y, b:z}
+ * OR 
+ * r, g, b
+*/
+}//end init()
+function RGBtoHSV(r, g, b) {
+    if (arguments.length === 1) {
+        g = r.g, b = r.b, r = r.r;
+    }
+    var max = Math.max(r, g, b), min = Math.min(r, g, b),
+        d = max - min,
+        h,
+        s = (max === 0 ? 0 : d / max),
+        v = max / 255;
+
+    switch (max) {
+        case min: h = 0; break;
+        case r: h = (g - b) + d * (g < b ? 6: 0); h /= 6 * d; break;
+        case g: h = (b - r) + d * 2; h /= 6 * d; break;
+        case b: h = (r - g) + d * 4; h /= 6 * d; break;
+    }
+
+    return {
+        h: h*179,
+        s: s*255,
+        v: v*255
+    };
+}
+
+
+function onOpenCvReady() {
+  document.body.classList.remove("loading");
+  let cv=window.cv;
+  init();
+};
+</script>
+<script async src="js/opencv.js" onload="onOpenCvReady();"></script>
+</body>
+</html>
+             

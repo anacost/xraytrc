@@ -1,6 +1,5 @@
 # xraytrck
 
-Visit <https://pages.github.uio.no/anacos/xraytrc/> (still under construction) to try CamShift and dense optical flow for x-ray video of granular flow.
 
 Data (raw data from x-ray machine in the Hydrodynamic-lab and processed videos- converted to mp4 or ogg) is published on <https:osf.io/7whdb>
 

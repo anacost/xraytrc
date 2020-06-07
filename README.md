@@ -1,5 +1,6 @@
 # xraytrck
 
+[![DOI](https://zenodo.org/badge/249768264.svg)](https://zenodo.org/badge/latestdoi/249768264)
 
 Data (raw data from x-ray machine in the Hydrodynamic-lab and processed videos- converted to mp4 or ogg) is published on <https:osf.io/7whdb>
 
